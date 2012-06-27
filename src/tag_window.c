@@ -30,7 +30,6 @@
 
 static void tag_window_draw_tags(TagWin *win);
 static int write_tag(TagLib_File *file, const int field, const char *data);
-static int tag_type_by_field(TagWin *win, FIELD *field);
 
 
 TagWin *tag_window_new(void)
@@ -251,16 +250,22 @@ static void tag_window_draw_tags(TagWin *win)
 void tag_window_keypress(void *window, int ch)
 {
     TagWin *win = (TagWin *) window;
+    FIELD *cur_f = NULL;
 
     assert(win != NULL);
 
+    cur_f = current_field(win->form);
+    assert(cur_f != NULL);
+
     switch(ch) {
     case KEY_DOWN:
-        form_driver(win->form, REQ_NEXT_FIELD);
+        if (field_index(cur_f) < TAG_ATTR_COMMENT)
+            form_driver(win->form, REQ_NEXT_FIELD);
         form_driver(win->form, REQ_END_LINE);
         break;
     case KEY_UP:
-        form_driver(win->form, REQ_PREV_FIELD);
+        if (field_index(cur_f) > TAG_ATTR_TITLE)
+            form_driver(win->form, REQ_PREV_FIELD);
         form_driver(win->form, REQ_END_LINE);
         break;
     case KEY_BACKSPACE:
@@ -276,15 +281,12 @@ void tag_window_keypress(void *window, int ch)
         form_driver(win->form, REQ_NEXT_PAGE);
         break;
     case KEY_F(5):
-        /* form_driver(win->form, REQ_NEXT_FIELD);
-           form_driver(win->form, REQ_PREV_FIELD); */
         if (form_driver(win->form, REQ_VALIDATION) == E_OK)
         {
-            FIELD *cur_f = current_field(win->form);
             char *cur_b = trim(field_buffer(cur_f, 0));
             /* Record the selected field */
             write_tag(win->selected_file, 
-                      tag_type_by_field(win, cur_f),
+                      field_index(cur_f),
                       cur_b);
             free(cur_b);
         } else {
@@ -359,9 +361,12 @@ static int write_tag(TagLib_File *file, const int field, const char *data)
     int ret_code = 0;
     TagLib_Tag *tags = NULL;
 
-    assert(file != NULL);
     assert(field > 0);
     assert(data != NULL);
+
+    if (file == NULL) {
+        return -1;
+    }
 
     tags = taglib_file_tag(file);
 
@@ -405,16 +410,3 @@ static int write_tag(TagLib_File *file, const int field, const char *data)
 
 }
 
-static int tag_type_by_field(TagWin *win, FIELD *field)
-{
-    int i;
-    int field_n = -1;
-    for (i = 0; i < TAG_NULL; i++) {
-        if (field == win->attribute[i]) {
-            field_n = i;
-            break;
-        }
-    }
-
-    return field_n;
-}
